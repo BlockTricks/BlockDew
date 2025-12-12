@@ -5,11 +5,10 @@ import {
   makeContractDeploy,
   broadcastTransaction,
   PostConditionMode,
-  StacksMainnet,
-  StacksTestnet,
   TransactionVersion,
   getAddressFromPrivateKey,
 } from '@stacks/transactions'
+import { StacksMainnet, StacksTestnet } from '@stacks/network'
 import { generateWallet } from '@stacks/wallet-sdk'
 
 async function main() {
