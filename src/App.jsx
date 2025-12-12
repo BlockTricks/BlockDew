@@ -9,6 +9,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [threshold, setThreshold] = useState(300)
+  const [stateLoading, setStateLoading] = useState(false)
+  const [contractBusy, setContractBusy] = useState(false)
 
   const baseUrl = network === 'mainnet' ? 'https://api.hiro.so' : 'https://api.testnet.hiro.so'
   const contractAddress = 'SP2QNSNKR3NRDWNTX0Q7R4T8WGBJ8RE8RA516AKZP'
@@ -57,6 +59,7 @@ function App() {
   const [paused, setPaused] = useState(null)
   const [chainFee, setChainFee] = useState(null)
   const fetchContractState = useCallback(async () => {
+    setStateLoading(true)
     try {
       const sender = contractAddress
       const read = async (fn) => {
@@ -91,6 +94,8 @@ function App() {
     } catch {
       setPaused(null)
       setChainFee(null)
+    } finally {
+      setStateLoading(false)
     }
   }, [baseUrl, contractAddress, contractName])
 
@@ -111,6 +116,7 @@ function App() {
   }
 
   const callPause = async () => {
+    setContractBusy(true)
     await request('stx_callContract', {
       contract: `${contractAddress}.${contractName}`,
       functionName: 'pause',
@@ -119,8 +125,10 @@ function App() {
       postConditionMode: 'deny'
     })
     fetchContractState()
+    setContractBusy(false)
   }
   const callUnpause = async () => {
+    setContractBusy(true)
     await request('stx_callContract', {
       contract: `${contractAddress}.${contractName}`,
       functionName: 'unpause',
@@ -129,6 +137,7 @@ function App() {
       postConditionMode: 'deny'
     })
     fetchContractState()
+    setContractBusy(false)
   }
   const [newFee, setNewFee] = useState('0')
   const callSetFee = async () => {
@@ -136,6 +145,7 @@ function App() {
     if (!Number.isFinite(u) || u < 0) return
     const bytes = serializeCV(uintCV(u))
     const argHex = '0x' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+    setContractBusy(true)
     await request('stx_callContract', {
       contract: `${contractAddress}.${contractName}`,
       functionName: 'set-fee',
@@ -144,6 +154,7 @@ function App() {
       postConditionMode: 'deny'
     })
     fetchContractState()
+    setContractBusy(false)
   }
 
   return (
@@ -209,8 +220,15 @@ function App() {
               <input type="number" min="0" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
               <button onClick={callSetFee} disabled={!connected}>Apply</button>
             </div>
+            {(stateLoading || contractBusy) && (
+              <div className="spinner" aria-label="Loading contract" />
+            )}
           </div>
-          <div className="status">Paused: {paused === null ? '—' : paused ? 'Yes' : 'No'} | On-chain fee: {chainFee == null ? '—' : String(chainFee)}</div>
+          <div className="status">
+            State: {paused === null ? '—' : paused ? 'Inactive' : 'Active'}
+            {' '}| Paused: {paused === null ? '—' : paused ? 'Yes' : 'No'}
+            {' '}| On-chain fee: {chainFee == null ? '—' : String(chainFee)}
+          </div>
         </div>
       </div>
       <div className="footnote">Data: {baseUrl}/v2/fees/transfer</div>
