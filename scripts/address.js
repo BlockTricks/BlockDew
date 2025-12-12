@@ -3,9 +3,9 @@ import { generateWallet } from '@stacks/wallet-sdk'
 import { getAddressFromPrivateKey, TransactionVersion } from '@stacks/transactions'
 
 async function main() {
-  const mnemonic = process.env.MNEMONIC
-  const networkName = (process.env.STACKS_NETWORK || 'testnet').toLowerCase()
-  const accountIndex = Number(process.env.ACCOUNT_INDEX || 0)
+  const mnemonic = globalThis.process?.env?.MNEMONIC
+  const networkName = (globalThis.process?.env?.STACKS_NETWORK || 'testnet').toLowerCase()
+  const accountIndex = Number(globalThis.process?.env?.ACCOUNT_INDEX || 0)
   if (!mnemonic) throw new Error('MNEMONIC is required in environment')
 
   const wallet = await generateWallet({ secretKey: mnemonic, password: 'unused' })
@@ -21,5 +21,5 @@ async function main() {
 
 main().catch((e) => {
   console.error(e)
-  process.exit(1)
+  globalThis.process.exit(1)
 })

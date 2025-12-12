@@ -12,9 +12,9 @@ import { StacksMainnet, StacksTestnet } from '@stacks/network'
 import { generateWallet } from '@stacks/wallet-sdk'
 
 async function main() {
-  const mnemonic = process.env.MNEMONIC
-  const networkName = (process.env.STACKS_NETWORK || 'testnet').toLowerCase()
-  const accountIndex = Number(process.env.ACCOUNT_INDEX || 0)
+  const mnemonic = globalThis.process?.env?.MNEMONIC
+  const networkName = (globalThis.process?.env?.STACKS_NETWORK || 'testnet').toLowerCase()
+  const accountIndex = Number(globalThis.process?.env?.ACCOUNT_INDEX || 0)
   if (!mnemonic) throw new Error('MNEMONIC is required in environment')
 
   const network = networkName === 'mainnet' ? new StacksMainnet() : new StacksTestnet()
@@ -27,7 +27,7 @@ async function main() {
   const version = networkName === 'mainnet' ? TransactionVersion.Mainnet : TransactionVersion.Testnet
   const senderAddress = getAddressFromPrivateKey(senderKey, version)
 
-  const codeBody = fs.readFileSync(path.join(process.cwd(), 'contracts', 'blockdew.clar'), 'utf8')
+  const codeBody = fs.readFileSync(path.join(globalThis.process.cwd(), 'contracts', 'blockdew.clar'), 'utf8')
 
   const nonceRes = await fetch(`${baseUrl}/v2/accounts/${senderAddress}`)
   const nonceJson = await nonceRes.json()
@@ -43,7 +43,7 @@ async function main() {
     postConditionMode: PostConditionMode.Deny,
   })
 
-  const serializedHex = Buffer.from(draft.serialize()).toString('hex')
+  const serializedHex = globalThis.Buffer.from(draft.serialize()).toString('hex')
   const frRes = await fetch(`${baseUrl}/extended/v1/fee_rate`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -52,7 +52,7 @@ async function main() {
   const frJson = await frRes.json()
   const feeRate = typeof frJson === 'number' ? frJson : frJson.fee_rate ?? frJson.estimated_fee_rate
   if (!feeRate) throw new Error('Failed to fetch fee rate')
-  const txSize = Buffer.from(draft.serialize()).byteLength
+  const txSize = globalThis.Buffer.from(draft.serialize()).byteLength
   const fee = BigInt(feeRate * txSize)
 
   const tx = await makeContractDeploy({
@@ -77,5 +77,5 @@ async function main() {
 
 main().catch((e) => {
   console.error(e)
-  process.exit(1)
+  globalThis.process.exit(1)
 })

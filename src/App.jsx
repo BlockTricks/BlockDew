@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { connect, disconnect, isConnected, request, getLocalStorage } from '@stacks/connect'
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import { connect, disconnect, isConnected, request } from '@stacks/connect'
 import './App.css'
 
 function App() {
@@ -55,7 +55,7 @@ function App() {
 
   const [paused, setPaused] = useState(null)
   const [chainFee, setChainFee] = useState(null)
-  const fetchContractState = async () => {
+  const fetchContractState = useCallback(async () => {
     try {
       const sender = contractAddress
       const read = async (fn) => {
@@ -75,12 +75,7 @@ function App() {
       let f = null
       if (feeRes && feeRes.result) {
         const hex = feeRes.result.replace(/^0x/, '')
-        try {
-          const buf = Buffer.from(hex, 'hex')
-          f = BigInt(`0x${hex}`)
-        } catch {
-          f = null
-        }
+        try { f = BigInt(`0x${hex}`) } catch { f = null }
       }
       setPaused(p)
       setChainFee(f)
@@ -88,11 +83,9 @@ function App() {
       setPaused(null)
       setChainFee(null)
     }
-  }
+  }, [baseUrl, contractAddress, contractName])
 
-  useEffect(() => {
-    fetchContractState()
-  }, [baseUrl])
+  useEffect(() => { fetchContractState() }, [fetchContractState])
 
   const [connected, setConnected] = useState(false)
   useEffect(() => {
