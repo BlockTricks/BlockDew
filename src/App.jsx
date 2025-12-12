@@ -40,7 +40,7 @@ function App() {
         }
         if (rate == null) throw new Error('Unable to parse fee rate')
         setFeeRate(rate)
-      } catch (e) {
+      } catch {
         setError('Failed to load fee rate')
         setFeeRate(null)
       } finally {
