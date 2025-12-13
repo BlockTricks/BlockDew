@@ -196,7 +196,7 @@ function App() {
       <h1>BlockDew</h1>
       <p className="subtitle">Stacks transaction fee snapshot</p>
       {(stateLoading || contractBusy) && (
-        <div className="overlay">
+        <div className="overlay-fixed">
           <div className="overlay-content">
             <div className="spinner spinner-lg" aria-label="Loading" />
             <div className="overlay-text">{contractBusy ? (txMessage || 'Submitting transaction…') : 'Loading contract state…'}</div>
