@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
+import { connect, disconnect, isConnected, request } from '@stacks/connect'
+import { uintCV, hexToCV, serializeCV, cvToString } from '@stacks/transactions'
 import './App.css'
 
 function App() {
@@ -7,8 +9,13 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [threshold, setThreshold] = useState(300)
+  const [stateLoading, setStateLoading] = useState(false)
+  const [contractBusy, setContractBusy] = useState(false)
+  const [txMessage, setTxMessage] = useState('')
 
   const baseUrl = network === 'mainnet' ? 'https://api.hiro.so' : 'https://api.testnet.hiro.so'
+  const contractAddress = 'SP2QNSNKR3NRDWNTX0Q7R4T8WGBJ8RE8RA516AKZP'
+  const contractName = 'blockdew'
 
   const isGoodTime = useMemo(() => {
     if (feeRate == null) return null
@@ -50,10 +57,152 @@ function App() {
     fetchFee()
   }, [baseUrl])
 
+  const [paused, setPaused] = useState(null)
+  const [chainFee, setChainFee] = useState(null)
+  const fetchContractState = useCallback(async () => {
+    setStateLoading(true)
+    try {
+      const sender = contractAddress
+      const read = async (fn) => {
+        const res = await fetch(`${baseUrl}/v2/contracts/call-read/${contractAddress}/${contractName}/${fn}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sender, arguments: [] })
+        })
+        const json = await res.json()
+        return json
+      }
+      const pausedRes = await read('is-paused')
+      const feeRes = await read('get-fee')
+      const p = pausedRes && pausedRes.result ? (() => {
+        try {
+          const s = cvToString(hexToCV(pausedRes.result))
+          const m = s.match(/\(ok\s+(true|false)\)/)
+          return m ? m[1] === 'true' : null
+        } catch { return null }
+      })() : null
+      let f = null
+      if (feeRes && feeRes.result) {
+        try {
+          const s = cvToString(hexToCV(feeRes.result))
+          const m = s.match(/\(ok\s+u([0-9]+)\)/)
+          f = m ? BigInt(m[1]) : null
+        } catch { f = null }
+      }
+      setPaused(p)
+      setChainFee(f)
+    } catch {
+      setPaused(null)
+      setChainFee(null)
+    } finally {
+      setStateLoading(false)
+    }
+  }, [baseUrl, contractAddress, contractName])
+
+  const waitForTx = async (txId) => {
+    if (!txId) return null
+    setTxMessage('Waiting for confirmation…')
+    let status = null
+    for (let i = 0; i < 60; i++) {
+      try {
+        const res = await fetch(`${baseUrl}/extended/v1/tx/${txId}?unanchored=true`)
+        const json = await res.json()
+        status = json.tx_status || json.status || null
+        if (status === 'success' || status === 'abort_by_response') break
+      } catch { continue }
+      await new Promise((r) => setTimeout(r, 2000))
+    }
+    if (status === 'success') setTxMessage('Confirmed')
+    else if (status === 'abort_by_response') setTxMessage('Failed')
+    else setTxMessage('Pending or unknown')
+    return status
+  }
+
+  useEffect(() => { fetchContractState() }, [fetchContractState])
+
+  const [connected, setConnected] = useState(false)
+  useEffect(() => {
+    setConnected(isConnected())
+  }, [])
+
+  const doConnect = async () => {
+    await connect({ forceWalletSelect: true })
+    setConnected(isConnected())
+  }
+  const doDisconnect = async () => {
+    await disconnect()
+    setConnected(isConnected())
+  }
+
+  const callPause = async () => {
+    setContractBusy(true)
+    try {
+      const res = await request('stx_callContract', {
+        contract: `${contractAddress}.${contractName}`,
+        functionName: 'pause',
+        functionArgs: [],
+        postConditions: [],
+        postConditionMode: 'deny'
+      })
+      const txId = typeof res === 'string' ? res : (res?.txId || res?.txid || null)
+      await waitForTx(txId)
+      await fetchContractState()
+    } finally {
+      setContractBusy(false)
+    }
+  }
+  const callUnpause = async () => {
+    setContractBusy(true)
+    try {
+      const res = await request('stx_callContract', {
+        contract: `${contractAddress}.${contractName}`,
+        functionName: 'unpause',
+        functionArgs: [],
+        postConditions: [],
+        postConditionMode: 'deny'
+      })
+      const txId = typeof res === 'string' ? res : (res?.txId || res?.txid || null)
+      await waitForTx(txId)
+      await fetchContractState()
+    } finally {
+      setContractBusy(false)
+    }
+  }
+  const [newFee, setNewFee] = useState('0')
+  const callSetFee = async () => {
+    const u = Number(newFee)
+    if (!Number.isFinite(u) || u < 0) return
+    const bytes = serializeCV(uintCV(u))
+    const argHex = '0x' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+    setContractBusy(true)
+    try {
+      const res = await request('stx_callContract', {
+        contract: `${contractAddress}.${contractName}`,
+        functionName: 'set-fee',
+        functionArgs: [argHex],
+        postConditions: [],
+        postConditionMode: 'deny'
+      })
+      const txId = typeof res === 'string' ? res : (res?.txId || res?.txid || null)
+      await waitForTx(txId)
+      await fetchContractState()
+    } finally {
+      setContractBusy(false)
+    }
+  }
+
   return (
     <div className="container">
       <h1>BlockDew</h1>
       <p className="subtitle">Stacks transaction fee snapshot</p>
+      {(stateLoading || contractBusy) && (
+        <div className="overlay-fixed">
+          <div className="overlay-content">
+            <div className="spinner spinner-lg" aria-label="Loading" />
+            <div className="overlay-text">{contractBusy ? (txMessage || 'Submitting transaction…') : 'Loading contract state…'}</div>
+          </div>
+        </div>
+      )}
 
       <div className="controls">
         <label className={network === 'mainnet' ? 'active' : ''}>
@@ -99,6 +248,31 @@ function App() {
             )}
           </div>
         )}
+        <div className="actions">
+          <div className="controls">
+            {!connected ? (
+              <button onClick={doConnect}>Connect Wallet</button>
+            ) : (
+              <button onClick={doDisconnect}>Disconnect</button>
+            )}
+            <button onClick={callPause} disabled={!connected || contractBusy}>Pause</button>
+            <button onClick={callUnpause} disabled={!connected || contractBusy}>Unpause</button>
+            <div className="threshold">
+              <span>Set fee</span>
+              <input type="number" min="0" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
+              <button onClick={callSetFee} disabled={!connected || contractBusy}>Apply</button>
+            </div>
+            {(stateLoading || contractBusy) && (
+              <div className="spinner" aria-label="Loading contract" />
+            )}
+          </div>
+          <div className="status">
+            State: {paused === null ? '—' : paused ? 'Inactive' : 'Active'}
+            {' '}| Paused: {paused === null ? '—' : paused ? 'Yes' : 'No'}
+            {' '}| On-chain fee: {chainFee == null ? '—' : String(chainFee)}
+            {txMessage && <> | {txMessage}</>}
+          </div>
+        </div>
       </div>
       <div className="footnote">Data: {baseUrl}/v2/fees/transfer</div>
     </div>

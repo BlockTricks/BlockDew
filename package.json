@@ -12,12 +12,14 @@
     "deploy:mainnet": "STACKS_NETWORK=mainnet node scripts/deploy.js"
   },
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "@stacks/transactions": "^6.16.0",
+    "@stacks/auth": "^6.11.0",
+    "@stacks/connect": "^8.2.3",
     "@stacks/network": "^6.14.0",
+    "@stacks/transactions": "^6.16.0",
     "@stacks/wallet-sdk": "^6.11.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
