@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { connect, disconnect, isConnected, request } from '@stacks/connect'
-import { uintCV, hexToCV, serializeCV } from '@stacks/transactions'
+import { uintCV, hexToCV, serializeCV, cvToString } from '@stacks/transactions'
 import './App.css'
 
 function App() {
@@ -76,18 +76,17 @@ function App() {
       const feeRes = await read('get-fee')
       const p = pausedRes && pausedRes.result ? (() => {
         try {
-          const cv = hexToCV(pausedRes.result)
-          // (ok true) or (ok false)
-          const inner = cv.value
-          return inner && inner.type === 'bool' ? inner.value : null
+          const s = cvToString(hexToCV(pausedRes.result))
+          const m = s.match(/\(ok\s+(true|false)\)/)
+          return m ? m[1] === 'true' : null
         } catch { return null }
       })() : null
       let f = null
       if (feeRes && feeRes.result) {
         try {
-          const cv = hexToCV(feeRes.result)
-          const inner = cv.value
-          f = inner && inner.type === 'uint' ? inner.value : null
+          const s = cvToString(hexToCV(feeRes.result))
+          const m = s.match(/\(ok\s+u([0-9]+)\)/)
+          f = m ? BigInt(m[1]) : null
         } catch { f = null }
       }
       setPaused(p)
@@ -196,6 +195,14 @@ function App() {
     <div className="container">
       <h1>BlockDew</h1>
       <p className="subtitle">Stacks transaction fee snapshot</p>
+      {(stateLoading || contractBusy) && (
+        <div className="overlay">
+          <div className="overlay-content">
+            <div className="spinner spinner-lg" aria-label="Loading" />
+            <div className="overlay-text">{contractBusy ? (txMessage || 'Submitting transaction…') : 'Loading contract state…'}</div>
+          </div>
+        </div>
+      )}
 
       <div className="controls">
         <label className={network === 'mainnet' ? 'active' : ''}>

@@ -126,6 +126,42 @@
   animation: spin 0.8s linear infinite;
 }
 
+.spinner-lg {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+
+.overlay {
+  position: relative;
+}
+
+.overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  border-radius: 12px;
+}
+
+.overlay-content {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(20,20,20,0.9);
+  border: 1px solid #2f2f2f;
+  border-radius: 999px;
+}
+
+.overlay-text {
+  color: #ddd;
+  font-size: 0.9rem;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
