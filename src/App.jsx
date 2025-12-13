@@ -11,6 +11,7 @@ function App() {
   const [threshold, setThreshold] = useState(300)
   const [stateLoading, setStateLoading] = useState(false)
   const [contractBusy, setContractBusy] = useState(false)
+  const [txMessage, setTxMessage] = useState('')
 
   const baseUrl = network === 'mainnet' ? 'https://api.hiro.so' : 'https://api.testnet.hiro.so'
   const contractAddress = 'SP2QNSNKR3NRDWNTX0Q7R4T8WGBJ8RE8RA516AKZP'
@@ -99,6 +100,25 @@ function App() {
     }
   }, [baseUrl, contractAddress, contractName])
 
+  const waitForTx = async (txId) => {
+    if (!txId) return null
+    setTxMessage('Waiting for confirmation…')
+    let status = null
+    for (let i = 0; i < 60; i++) {
+      try {
+        const res = await fetch(`${baseUrl}/extended/v1/tx/${txId}?unanchored=true`)
+        const json = await res.json()
+        status = json.tx_status || json.status || null
+        if (status === 'success' || status === 'abort_by_response') break
+      } catch { continue }
+      await new Promise((r) => setTimeout(r, 2000))
+    }
+    if (status === 'success') setTxMessage('Confirmed')
+    else if (status === 'abort_by_response') setTxMessage('Failed')
+    else setTxMessage('Pending or unknown')
+    return status
+  }
+
   useEffect(() => { fetchContractState() }, [fetchContractState])
 
   const [connected, setConnected] = useState(false)
@@ -118,13 +138,15 @@ function App() {
   const callPause = async () => {
     setContractBusy(true)
     try {
-      await request('stx_callContract', {
+      const res = await request('stx_callContract', {
         contract: `${contractAddress}.${contractName}`,
         functionName: 'pause',
         functionArgs: [],
         postConditions: [],
         postConditionMode: 'deny'
       })
+      const txId = typeof res === 'string' ? res : (res?.txId || res?.txid || null)
+      await waitForTx(txId)
       await fetchContractState()
     } finally {
       setContractBusy(false)
@@ -133,13 +155,15 @@ function App() {
   const callUnpause = async () => {
     setContractBusy(true)
     try {
-      await request('stx_callContract', {
+      const res = await request('stx_callContract', {
         contract: `${contractAddress}.${contractName}`,
         functionName: 'unpause',
         functionArgs: [],
         postConditions: [],
         postConditionMode: 'deny'
       })
+      const txId = typeof res === 'string' ? res : (res?.txId || res?.txid || null)
+      await waitForTx(txId)
       await fetchContractState()
     } finally {
       setContractBusy(false)
@@ -153,13 +177,15 @@ function App() {
     const argHex = '0x' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
     setContractBusy(true)
     try {
-      await request('stx_callContract', {
+      const res = await request('stx_callContract', {
         contract: `${contractAddress}.${contractName}`,
         functionName: 'set-fee',
         functionArgs: [argHex],
         postConditions: [],
         postConditionMode: 'deny'
       })
+      const txId = typeof res === 'string' ? res : (res?.txId || res?.txid || null)
+      await waitForTx(txId)
       await fetchContractState()
     } finally {
       setContractBusy(false)
@@ -237,6 +263,7 @@ function App() {
             State: {paused === null ? '—' : paused ? 'Inactive' : 'Active'}
             {' '}| Paused: {paused === null ? '—' : paused ? 'Yes' : 'No'}
             {' '}| On-chain fee: {chainFee == null ? '—' : String(chainFee)}
+            {txMessage && <> | {txMessage}</>}
           </div>
         </div>
       </div>
