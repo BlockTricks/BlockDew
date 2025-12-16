@@ -51,6 +51,20 @@
   margin-left: auto;
 }
 
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+.icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
 .panel {
   border: 1px solid #2f2f2f;
   border-radius: 12px;
